@@ -6,6 +6,7 @@
 # Usage:
 #   Rscript analyze_repos.R [since] [until]
 #   since, until: dates in "YYYY-MM-DD" format (either may be omitted)
+#   since defaults to 90 days ago; until defaults to no upper bound
 
 suppressPackageStartupMessages({
   library(dplyr)
@@ -72,18 +73,19 @@ analyze <- function(owner = gh_username, since = NULL, until = NULL) {
 
   message("Fetching release download counts for ", nrow(repos), " repo(s)...")
   repos |> mutate(downloads = map_dbl(name, ~ fetch_release_downloads(owner, .x))) |>
+    filter(downloads > 0) |>
     arrange(desc(downloads))
 }
 
 if (sys.nframe() == 0) {
   args <- commandArgs(trailingOnly = TRUE)
-  since <- if (length(args) >= 1 && nzchar(args[[1]])) args[[1]] else NULL
+  since <- if (length(args) >= 1 && nzchar(args[[1]])) args[[1]] else as.character(today() - days(90))
   until <- if (length(args) >= 2 && nzchar(args[[2]])) args[[2]] else NULL
 
   results <- analyze(since = since, until = until)
   print(results, n = Inf)
 
-  if (nrow(results) > 0 && sum(results$downloads) > 0) {
+  if (nrow(results) > 0) {
     plot <- ggplot(results, aes(x = reorder(name, downloads), y = downloads)) +
       geom_col() +
       coord_flip() +
