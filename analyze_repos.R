@@ -17,9 +17,12 @@ suppressPackageStartupMessages({
   library(lubridate)
   library(ggplot2)
   library(jsonlite)
+  library(duckdb)
+  library(DBI)
 })
 
 gh_username <- "davidjayjackson"
+duckdb_path <- "repo_downloads.duckdb"
 
 run_gh <- function(args) {
   out <- system2("gh", args, stdout = TRUE, stderr = TRUE)
@@ -67,6 +70,19 @@ filter_by_created <- function(repos, since = NULL, until = NULL) {
   repos
 }
 
+save_to_duckdb <- function(results, path = duckdb_path, report_date = today()) {
+  con <- dbConnect(duckdb(), path)
+  on.exit(dbDisconnect(con, shutdown = TRUE))
+
+  to_write <- results |>
+    mutate(report_date = as.Date(report_date), .before = 1)
+
+  if (!("repo_downloads" %in% dbListTables(con))) {
+    dbCreateTable(con, "repo_downloads", to_write)
+  }
+  dbAppendTable(con, "repo_downloads", to_write)
+}
+
 analyze <- function(owner = gh_username, since = NULL, until = NULL) {
   message("Fetching repo list for ", owner, "...")
   repos <- fetch_repos(owner) |> filter_by_created(since, until)
@@ -86,6 +102,9 @@ if (sys.nframe() == 0) {
   print(results, n = Inf)
 
   if (nrow(results) > 0) {
+    save_to_duckdb(results)
+    message("Results saved to ", duckdb_path)
+
     plot <- ggplot(results, aes(x = reorder(name, downloads), y = downloads)) +
       geom_col() +
       coord_flip() +
