@@ -1,2 +1,2 @@
 # github_analysis
-R, tidyverse,gh, gitsum, and git2r to analyze repos downloads.
+R, tidyverse,gh, GitStats,git4r, and git2r to analyze repos downloads.
